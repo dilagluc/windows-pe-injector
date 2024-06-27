@@ -985,7 +985,7 @@ static int pdf_save_object(struct pdf_doc *pdf, FILE *fp, int index)
                 "  /Type /Font\r\n"
                 "  /Subtype /Type1\r\n"
                 "  /BaseFont /%s\r\n"
-                "  /Encoding /WinAnsiEncoding\r\n"
+                "  /Encoding /PDFDocEncoding\r\n"  /** Important */
                 ">>\r\n",
                 object->font.name);
         break;
@@ -1187,10 +1187,38 @@ static int utf8_to_utf32(const char *utf8, int len, uint32_t *utf32)
     }
 
     *utf32 = ch;
-    //printf("%d\n", *utf32);
+    //printf("0x%x\t", *utf32);
 
     return len;
 }
+
+/*static int utf8_to_utf32(const char *utf8, int len, uint32_t *utf32)
+{
+    uint32_t ch;
+    uint8_t mask;
+    if (len <= 0 || !utf8 || !utf32)
+        return -EINVAL;
+
+    ch = *(uint8_t *)utf8;
+
+    if (ch < 0x80) {
+        // 1-byte character (ASCII)
+        ch = (uint32_t)(*utf8++);
+        len = 1;
+    } else {
+        // 2-byte character (Extended ASCII)
+        ch = 0;
+        printf("0x%x\t", ch);
+        ch |= (0xC0 | ((uint32_t)(*utf8++) >> 6)) << 8; // First byte
+        printf("0x%x\t", ch);
+        ch |= (0x80 | ((uint32_t)(*utf8++) & 0x3F));
+        printf("0x%x\t", ch);
+        len = 2;
+    }
+    printf("0x%x\t", ch);
+    *utf32 = ch;
+    return len;
+}*/
 
 static int utf8_to_pdfencoding(struct pdf_doc *pdf, const char *utf8, int len,
                                uint8_t *res)
@@ -1335,11 +1363,14 @@ static int pdf_add_text_spacing(struct pdf_doc *pdf, struct pdf_object *page,
     for (size_t i = 0; i < len;) {
         int code_len;
         uint8_t pdf_char;
-        code_len = utf8_to_pdfencoding(pdf, &text[i], len - i, &pdf_char);
-        if (code_len < 0) {
+        pdf_char = text[i];
+        //code_len = utf8_to_pdfencoding(pdf, &text[i], len - i, &pdf_char);
+        //code_len = utf8_to_pdfencoding(pdf, (const unsigned char *)&text[i], len - i, &pdf_char);
+
+        /*if (code_len < 0) {
             dstr_free(&str);
             return code_len;
-        }
+        }*/
 
         if (strchr("()\\", pdf_char)) {
             char buf[3];
@@ -1353,10 +1384,10 @@ static int pdf_add_text_spacing(struct pdf_doc *pdf, struct pdf_object *page,
             ;
         } else {
             dstr_append_data(&str, &pdf_char, 1);
-            printf("%c\n", text[i]);
+            printf("0x%x\n", pdf_char);
         }
 
-        i += code_len;
+        i += 1;
     }
     dstr_append(&str, ") Tj ");
     dstr_append(&str, "ET");
@@ -1721,6 +1752,20 @@ int pdf_add_text_wrap(struct pdf_doc *pdf, struct pdf_object *page,
     /* Move through the text string, stopping at word boundaries,
      * trying to find the longest text string we can fit in the given width
      */
+    
+    printf("%p\n", text);
+
+    printf("%x\n", (unsigned char)text[0]);
+    printf("%x\n", (unsigned char)text[1]);
+    printf("%x\n", (unsigned char)text[2]);
+    printf("%x\n", (unsigned char)text[3]);
+    printf("%x\n", (unsigned char)text[4]);
+    printf("%x\n", (unsigned char)text[5]);
+    printf("%x\n", (unsigned char)text[6]);
+    printf("%x\n", (unsigned char)text[7]);
+
+    printf("\n\n");
+
     const char *start = text;
     const char *last_best = text;
     const char *end = text;
@@ -1742,13 +1787,18 @@ int pdf_add_text_wrap(struct pdf_doc *pdf, struct pdf_object *page,
         int e;
 
         end = new_end;
+        printf("here1");
 
         e = pdf_text_point_width(pdf, start, end - start, size, widths,
                                  &line_width);
+        printf("here2");
         if (e < 0)
             return e;
+        
+        printf("here3");
 
         if (line_width >= wrap_width) {
+            printf("here4");
             if (last_best == start) {
                 /* There is a single word that is too long for the line */
                 ptrdiff_t i;
