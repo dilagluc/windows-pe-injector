@@ -97,6 +97,8 @@ int main(int ac, char **av)
     printf("DOS SIG %c%c\n", ((char*)&pDosHeader->e_magic)[0], ((char*)&pDosHeader->e_magic)[1]);
     printf("DOS next %d\n", pDosHeader->e_lfanew);
 #endif
+    //SIGNATURE 
+    memcpy((void*)&pDosHeader->e_res2[8], "INJ\x00", 4);
     PIMAGE_NT_HEADERS64 pNtHeader = (PIMAGE_NT_HEADERS64)((PUCHAR)lpMapAdr + pDosHeader->e_lfanew);
     //printf("NT SIG %c%c\n", ((char*)&pNtHeader->Signature)[0], ((char*)&pNtHeader->Signature)[1]);
     char *sig = (char*)&pNtHeader->Signature;

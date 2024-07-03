@@ -8,7 +8,7 @@ injected segment read execute
     __begin_of_code label BYTE
     payload proc
 
-        call _next 
+        call _next
         _next:
             ; load rip into rbp
             pop rbp 
